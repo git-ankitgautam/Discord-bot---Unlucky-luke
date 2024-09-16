@@ -1,0 +1,7 @@
+__pycache__
+Discord py code
+node_modules
+gitignore
+.env
+*test.py
+

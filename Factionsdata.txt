@@ -1,0 +1,52 @@
+{
+  
+  "Brave survivors" :
+  {
+    "ID": "39960",
+    "name": "Brave survivors",
+    "tag" : "bs"
+  },
+
+  "Flying cadets" : 
+  {
+    "ID": "41832",
+    "name": "Flying Cadets",
+    "tag" : "fc"
+  },
+
+  "Jack of Trades":
+  {
+    "ID": "41937",
+    "name": "Jack of Trades",
+    "tag": "jt"
+  },
+
+  "Merciful Vanguards" : 
+  {
+    "ID": "34352",
+    "name": "Merciful Vanguards",
+    "tag" : "mv"
+  },
+
+  "Masters of Fate" : 
+  {
+    "ID": "46012",
+    "name": "Masters of Fate", 
+    "tag" : "mf"
+  },
+
+  "Rusty's ravagers" : 
+  {
+    "ID": "41456",
+    "name": "Rusty's Ravagers",
+    "tag" : "rs"
+  },
+
+  "School of Devlins":
+  {
+    "ID": "16296",
+    "name": "School of Devlins",
+    "tag" : "sd"
+  }
+
+}
