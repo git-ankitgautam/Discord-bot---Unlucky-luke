@@ -37,7 +37,7 @@ def joke_response():
     if(rand == 1):
         joke = dad_jokes()
         
-    elif(rand ==2):
-        joke= simple_2jokes() 
+    else:
+        joke= simple_2jokes()
     
     return joke
