@@ -6,7 +6,6 @@ with open("Factionsdata.txt") as file:
     facdata = file.read()
 
 fdata = json.loads(facdata)
-arr = list()
 
 
 def api_stuff(fname,response0):

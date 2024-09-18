@@ -1,3 +1,4 @@
+
 import discord
 from discord import colour
 from faction_api_struct import api_stuff
