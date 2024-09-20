@@ -3,11 +3,15 @@ from discord.ext import commands
 from discord import app_commands
 from config import TOKEN,TESTING_SERVER_ID
 import enum
+import asyncio
 from faction_intros_embed import response_embed
 from enlightenme import get_quote
 from typing import Literal
 import time
 from imbored import joke_response
+from profanity_checker import profanity_check
+
+
 
 class Bot_client(commands.Bot):
     async def on_ready(self):
@@ -22,13 +26,14 @@ class Bot_client(commands.Bot):
 
     async def on_message(self, message):
         msg = message.content.lower()
-        print(f"message from: {message.author} : {msg}")
         if message.author == self.user:
             return
         if message.content.startswith("hey luke"):
             await message.channel.send(f"Hello {message.author.display_name}, this is a 100 percent luke, there is no doubt to it, trust me :D")
-        if "shit" in message.content:
-            await message.channel.send("LANGUAGE!")
+        if profanity_check(message.content):
+            with open("captain-america.gif", "rb") as language_gif:
+                await message.reply(file=discord.File(language_gif))
+
 
 intents_list = discord.Intents.default()
 intents_list.message_content = True
@@ -68,7 +73,7 @@ async def author(interaction: discord.Interaction):
 async def imbored(interaction: discord.Interaction):
     joke = joke_response()
     await interaction.response.send_message(f"{joke[0]}")
-    time.sleep(4)
+    await asyncio.sleep(4)
     await interaction.followup.send(joke[1] + " :rofl:")
 
 

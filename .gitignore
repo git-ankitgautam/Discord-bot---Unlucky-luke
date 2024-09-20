@@ -3,5 +3,8 @@ Discord py code
 node_modules
 gitignore
 .env
+/.vscode
 *test.py
-
+*backup.py
+profanity_wordslist.txt
+captain-america.gif
