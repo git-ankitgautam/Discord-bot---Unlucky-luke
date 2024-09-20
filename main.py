@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-from config import TOKEN,TESTING_SERVER_ID
+from config import TOKEN,TESTING_SERVER_ID,DEVLINS_SERVER_ID
 import asyncio
 from faction_intros_embed import response_embed
 from enlightenme import get_quote
@@ -36,33 +36,35 @@ class Bot_client(commands.Bot):
 intents_list = discord.Intents.default()
 intents_list.message_content = True
 testing_Server_object = discord.Object(id=int(TESTING_SERVER_ID))
+devlins_Server_object = discord.Object(id=int(DEVLINS_SERVER_ID))
+list_of_guilds = [testing_Server_object, devlins_Server_object]
 client = Bot_client(command_prefix="!", intents = intents_list)
 
 quote = {}
 
-@client.tree.command(name="hello", description="say hello to Luke", guild=testing_Server_object)
+@client.tree.command(name="hello", description="say hello to Luke", guilds=list_of_guilds)
 async def say_hello(interaction: discord.Interaction):
     await interaction.response.send_message("hello!, this is a 100 percent luke, there is no doubt to it, trust me :D \n beware of anyone else claiming to be me, I've seen some around :eyes:")
 
 
-@client.tree.command(name="repeat", description="Have him say what you always wanted luke to say! its the same thing! especially for legal purposes!", guild=testing_Server_object)
+@client.tree.command(name="repeat", description="Have him say what you always wanted luke to say! its the same thing! especially for legal purposes!", guilds=list_of_guilds)
 async def repeat_whatever_message_says(interaction: discord.Interaction, repeat:str):
     await interaction.response.send_message(repeat)
 
 
-@client.tree.command(name="faction_intro", description="get a snapshot of devlin factions from luke", guild=testing_Server_object)
+@client.tree.command(name="faction_intro", description="get a snapshot of devlin factions from luke", guilds=list_of_guilds)
 async def fruit(interaction: discord.Interaction, faction_name: Literal["Brave survivors", "Flying cadets", "Jack of Trades", "Merciful Vanguards", "Rusty's ravagers", "School of Devlins"]):
     fembed = response_embed(faction_name)
     await interaction.response.send_message(embed = fembed)
 
 
-@client.tree.command(name="enlightenme", description="luke sends you his words of enlightment, so you can transcend life", guild=testing_Server_object)
+@client.tree.command(name="enlightenme", description="luke sends you his words of enlightment, so you can transcend life", guilds=list_of_guilds)
 async def enlightenme(interaction: discord.Interaction):
     quote = get_quote()
     await interaction.response.send_message(embed=quote)
     
 
-@client.tree.command(name="imbored", description="luke will try to cheer you up", guild=testing_Server_object)
+@client.tree.command(name="imbored", description="luke will try to cheer you up", guilds=list_of_guilds)
 async def imbored(interaction: discord.Interaction):
     joke = joke_response()
     await interaction.response.send_message(f"{joke[0]}")

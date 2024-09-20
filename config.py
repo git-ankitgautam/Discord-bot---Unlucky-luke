@@ -4,3 +4,4 @@ load_dotenv()
 TOKEN = environ["TOKEN"]
 API_KEY = environ["API_KEY"]
 TESTING_SERVER_ID = environ["testing_server_id"]
+DEVLINS_SERVER_ID = environ["devlins_Server_id"]
