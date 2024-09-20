@@ -2,12 +2,10 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from config import TOKEN,TESTING_SERVER_ID
-import enum
 import asyncio
 from faction_intros_embed import response_embed
 from enlightenme import get_quote
 from typing import Literal
-import time
 from imbored import joke_response
 from profanity_checker import profanity_check
 
@@ -61,12 +59,7 @@ async def fruit(interaction: discord.Interaction, faction_name: Literal["Brave s
 @client.tree.command(name="enlightenme", description="luke sends you his words of enlightment, so you can transcend life", guild=testing_Server_object)
 async def enlightenme(interaction: discord.Interaction):
     quote = get_quote()
-    await interaction.response.send_message(quote["quote"])
-
-@client.tree.command(name="author", description="if you wanna know the 'real' author, help yourself", guild=testing_Server_object)
-async def author(interaction: discord.Interaction):
-    await interaction.response.send_message("hmm, okay I guess, it was a case of parallel thinking, here is the 'orginial' one as per the internet")
-    await interaction.followup.send(quote["author"])
+    await interaction.response.send_message(embed=quote)
     
 
 @client.tree.command(name="imbored", description="luke will try to cheer you up", guild=testing_Server_object)
