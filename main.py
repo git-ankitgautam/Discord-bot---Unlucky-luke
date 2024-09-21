@@ -8,7 +8,7 @@ from enlightenme import get_quote
 from typing import Literal
 from imbored import joke_response
 from profanity_checker import profanity_check
-
+from helpme import help_embed
 
 
 class Bot_client(commands.Bot):
@@ -25,7 +25,7 @@ class Bot_client(commands.Bot):
         msg = message.content.lower()
         if message.author == self.user:
             return
-        if message.content.startswith("hey luke"):
+        if message.content.startswith("hi luke"):
             await message.channel.send(f"Hello {message.author.display_name}, this is a 100 percent luke, there is no doubt to it, trust me :D")
         if profanity_check(message.content):
             with open("captain-america.gif", "rb") as language_gif:
@@ -67,6 +67,9 @@ async def imbored(interaction: discord.Interaction):
     await asyncio.sleep(4)
     await interaction.followup.send(joke[1] + " :rofl:")
 
-
+@client.tree.command(name="help", description="a summary of all commands")
+async def help(interaction: discord.Interaction):
+    embed = help_embed()
+    await interaction.response.send_message(embed = embed)
 
 client.run(TOKEN)
