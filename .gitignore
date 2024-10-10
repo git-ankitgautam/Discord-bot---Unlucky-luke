@@ -4,7 +4,7 @@ node_modules
 gitignore
 .env
 /.vscode
-*test.py
+test*.py
 *backup.py
 profanity_wordslist.txt
-captain-america.gif
+*test.py
