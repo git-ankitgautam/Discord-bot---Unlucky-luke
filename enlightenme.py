@@ -12,6 +12,6 @@ def get_quote():
 	embedvar = discord.Embed()
 
 	embedvar.add_field(name="",value=data["quote"], inline=False)
-	embedvar.add_field(name="",value=f"- {data["author"]}", inline=False)
+	embedvar.add_field(name="",value=f'- {data["author"]}', inline=False)
 
 	return embedvar
