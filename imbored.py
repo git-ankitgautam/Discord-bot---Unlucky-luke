@@ -7,9 +7,8 @@ def dad_jokes():
 
     headers = {"Accept": "application/json"}
 
-    source = requests.request("GET", url, headers=headers)
-    response0 = source.json()
-    response = response0["joke"]
+    source = requests.request("GET", url, headers=headers).json()
+    response = source["joke"]
     print(response)
     if '?' in response:
         response = response.split('?')
@@ -31,9 +30,8 @@ def simple_2jokes():
     return reply
 
 
-
 def joke_response():
-    rand = random.randint(1,2)
+    rand = random.randint(1,3)
     if(rand == 1):
         joke = dad_jokes()
         

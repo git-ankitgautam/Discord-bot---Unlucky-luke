@@ -65,7 +65,8 @@ async def imbored(interaction: discord.Interaction):
     joke = joke_response()
     await interaction.response.send_message(f"{joke[0]}")
     await asyncio.sleep(4)
-    await interaction.followup.send(joke[1] + " :rofl:")
+    if joke[1]:
+        await interaction.followup.send(joke[1] + " :rofl:")
 
 @client.tree.command(name="help", description="a summary of all commands")
 async def help(interaction: discord.Interaction):
