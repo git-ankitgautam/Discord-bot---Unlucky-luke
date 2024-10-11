@@ -31,7 +31,7 @@ def simple_2jokes():
 
 
 def joke_response():
-    rand = random.randint(1,3)
+    rand = random.randint(1,2)
     if(rand == 1):
         joke = dad_jokes()
         
