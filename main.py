@@ -25,9 +25,9 @@ class Bot_client(commands.Bot):
         msg = message.content.lower()
         if message.author == self.user:
             return
-        if message.content.startswith("hi luke"):
+        if msg.startswith("hi luke"):
             await message.channel.send(f"Hello {message.author.display_name}, this is a 100 percent luke, there is no doubt to it, trust me :D")
-        if profanity_check(message.content):
+        if profanity_check(msg):
             with open("captain-america.gif", "rb") as language_gif:
                 await message.reply(file=discord.File(language_gif))
 
