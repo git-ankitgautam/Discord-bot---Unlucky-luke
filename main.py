@@ -43,7 +43,7 @@ async def say_hello(interaction: discord.Interaction):
     await interaction.response.send_message("hello!, this is a 100 percent luke, there is no doubt to it, trust me :D \n beware of anyone else claiming to be me, I've seen some around :eyes:")
 
 
-@client.tree.command(name="repeat", description="Have him say what you always wanted luke to say! its the same thing! especially for legal purposes!")
+@client.tree.command(name="repeat", description="Have it say what you always wanted Luke to say! its the same thing! especially for legal purposes!")
 async def repeat_whatever_message_says(interaction: discord.Interaction, repeat:str):
     await interaction.response.send_message(repeat)
 
