@@ -24,6 +24,11 @@ def help_embed():
         value="Make luke say what you always wanted him to.",
         inline=False,
     )
+    embed.add_field(
+        name="/luke_says [prompt]",
+        value="Get a Luke-style line using the local message dataset.",
+        inline=False,
+    )
 
     embed.set_footer(text="made by -Kryptonian[2361119]")
     return embed

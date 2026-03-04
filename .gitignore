@@ -8,3 +8,4 @@ test*.py
 *backup.py
 profanity_wordslist.txt
 *test.py
+*.jsonl

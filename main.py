@@ -1,6 +1,9 @@
 import asyncio
+import json
 import logging
+from datetime import datetime
 from datetime import timedelta
+from pathlib import Path
 from typing import Literal, Optional
 
 import discord
@@ -12,6 +15,12 @@ from enlightenme import get_quote
 from faction_intros_embed import response_embed
 from helpme import help_embed
 from imbored import joke_response
+from leader_dataset import (
+    find_latest_dataset_file,
+    load_leader_messages,
+    pick_best_match,
+    pick_random_message,
+)
 from moderation_logic import evaluate_exemption
 from moderation_store import ModerationStore, render_member_template
 from profanity_checker import profanity_check
@@ -33,6 +42,18 @@ if not logger.handlers:
 
 store = ModerationStore()
 store.initialize()
+LEADER_DATASET_FILE = find_latest_dataset_file(".")
+LEADER_MESSAGES = (
+    load_leader_messages(LEADER_DATASET_FILE) if LEADER_DATASET_FILE else []
+)
+if LEADER_DATASET_FILE:
+    logger.info(
+        "Loaded leader dataset from %s with %s usable messages",
+        LEADER_DATASET_FILE,
+        len(LEADER_MESSAGES),
+    )
+else:
+    logger.warning("No user_messages_*.jsonl dataset found; /luke_says will be unavailable")
 
 
 def has_manage_guild(member: discord.Member) -> bool:
@@ -131,6 +152,12 @@ class BotClient(commands.Bot):
                 int(settings["warning_expiry_days"]),
             )
             threshold = int(settings["warn_threshold"])
+
+            try:
+                with open("captain-america.gif", "rb") as language_gif:
+                    await message.reply(file=discord.File(language_gif))
+            except FileNotFoundError:
+                logger.warning("captain-america.gif not found; skipping GIF reply")
 
             await message.reply(
                 f"Please avoid profanity. Warning {warning_count}/{threshold} (active for {int(settings['warning_expiry_days'])} days)."
@@ -272,6 +299,69 @@ async def imbored(interaction: discord.Interaction):
     await asyncio.sleep(4)
     if joke[1]:
         await interaction.followup.send(joke[1] + " :rofl:")
+
+
+@client.tree.command(
+    name="luke_says",
+    description="Get a Luke-style line from your exported message dataset",
+)
+@app_commands.describe(prompt="Optional topic to find a matching line")
+async def luke_says(interaction: discord.Interaction, prompt: Optional[str] = None):
+    if not LEADER_MESSAGES:
+        await interaction.response.send_message(
+            "I cannot find a dataset file. Add a `user_messages_*.jsonl` export in this folder and restart the bot.",
+            ephemeral=True,
+        )
+        return
+
+    selected = (
+        pick_best_match(LEADER_MESSAGES, prompt)
+        if prompt
+        else pick_random_message(LEADER_MESSAGES)
+    )
+    if not selected:
+        await interaction.response.send_message(
+            "Dataset is loaded but no usable messages were found.",
+            ephemeral=True,
+        )
+        return
+
+    content = selected["content"]
+    jump_url = selected.get("jump_url", "")
+    footer = f"\n\nSource: {jump_url}" if jump_url else ""
+    await interaction.response.send_message(content + footer)
+
+
+@client.tree.command(
+    name="luke_dataset_stats",
+    description="Show status of the local Luke message dataset",
+)
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.guild_only()
+async def luke_dataset_stats(interaction: discord.Interaction):
+    if not await ensure_guild_interaction(interaction):
+        return
+    if not isinstance(interaction.user, discord.Member) or not has_manage_guild(interaction.user):
+        await interaction.response.send_message(
+            "You need Manage Server permission to use this command.",
+            ephemeral=True,
+        )
+        return
+
+    if not LEADER_DATASET_FILE:
+        await interaction.response.send_message(
+            "No dataset file found in this folder (`user_messages_*.jsonl`).",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.send_message(
+        (
+            f"Dataset file: `{LEADER_DATASET_FILE.name}`\n"
+            f"Usable messages loaded: {len(LEADER_MESSAGES)}"
+        ),
+        ephemeral=True,
+    )
 
 
 @client.tree.command(name="set_entry_channel", description="Set the channel for join messages")
