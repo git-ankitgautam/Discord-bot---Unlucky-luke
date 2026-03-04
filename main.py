@@ -65,31 +65,7 @@ class BotClient(commands.Bot):
 
     async def on_member_join(self, member: discord.Member):
         try:
-            settings = store.ensure_guild_settings(member.guild.id)
-
-            if settings["welcome_dm_enabled"]:
-                dm_text = render_member_template(
-                    settings["welcome_dm_template"],
-                    member.mention,
-                    member.display_name,
-                    member.guild.name,
-                )
-                try:
-                    await member.send(dm_text)
-                except discord.Forbidden:
-                    pass
-
-            entry_channel_id = settings["entry_channel_id"]
-            if entry_channel_id:
-                channel = member.guild.get_channel(int(entry_channel_id))
-                if channel:
-                    join_text = render_member_template(
-                        settings["join_template"],
-                        member.mention,
-                        member.display_name,
-                        member.guild.name,
-                    )
-                    await channel.send(join_text)
+            await send_welcome_for_member(member)
         except Exception as e:
             print(f"Failed welcome flow for guild={member.guild.id}: {e}")
 
@@ -160,6 +136,40 @@ intents_list.members = True
 client = BotClient(command_prefix="!", intents=intents_list)
 
 
+async def send_welcome_for_member(member: discord.Member) -> tuple[bool, bool]:
+    dm_sent = False
+    channel_sent = False
+    settings = store.ensure_guild_settings(member.guild.id)
+
+    if settings["welcome_dm_enabled"]:
+        dm_text = render_member_template(
+            settings["welcome_dm_template"],
+            member.mention,
+            member.display_name,
+            member.guild.name,
+        )
+        try:
+            await member.send(dm_text)
+            dm_sent = True
+        except discord.Forbidden:
+            dm_sent = False
+
+    entry_channel_id = settings["entry_channel_id"]
+    if entry_channel_id:
+        channel = member.guild.get_channel(int(entry_channel_id))
+        if channel and isinstance(channel, discord.TextChannel):
+            join_text = render_member_template(
+                settings["join_template"],
+                member.mention,
+                member.display_name,
+                member.guild.name,
+            )
+            await channel.send(join_text)
+            channel_sent = True
+
+    return dm_sent, channel_sent
+
+
 @client.tree.command(name="hello", description="say hello to Luke")
 async def say_hello(interaction: discord.Interaction):
     await interaction.response.send_message(
@@ -210,6 +220,8 @@ async def imbored(interaction: discord.Interaction):
 
 
 @client.tree.command(name="set_entry_channel", description="Set the channel for join messages")
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(channel="Channel where join messages should be sent")
 async def set_entry_channel(interaction: discord.Interaction, channel: discord.TextChannel):
     if not await ensure_guild_interaction(interaction):
@@ -228,6 +240,8 @@ async def set_entry_channel(interaction: discord.Interaction, channel: discord.T
 
 
 @client.tree.command(name="welcome_dm", description="Enable or disable welcome DMs")
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(enabled="Whether new members should receive welcome DMs")
 async def welcome_dm(interaction: discord.Interaction, enabled: bool):
     if not await ensure_guild_interaction(interaction):
@@ -248,6 +262,8 @@ async def welcome_dm(interaction: discord.Interaction, enabled: bool):
     name="set_welcome_templates",
     description="Set join channel and DM welcome templates",
 )
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(
     join_text="Join message template ({user_mention}, {user_name}, {server})",
     dm_text="Welcome DM template ({user_mention}, {user_name}, {server})",
@@ -303,6 +319,8 @@ async def set_welcome_templates(
 
 
 @client.tree.command(name="mod_settings", description="Set profanity moderation thresholds")
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(
     threshold="Warnings before timeout (1-10)",
     timeout_minutes="Timeout duration in minutes (1-1440)",
@@ -336,6 +354,8 @@ async def mod_settings(
 
 
 @client.tree.command(name="set_exemption", description="Configure profanity warning exemptions")
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(
     mode="Exemption mode",
     role="Role to exempt when mode is role",
@@ -368,6 +388,8 @@ async def set_exemption(
 
 
 @client.tree.command(name="warnings", description="View a member's active warnings")
+@app_commands.guild_only()
+@app_commands.default_permissions(moderate_members=True)
 @app_commands.describe(user="Member to inspect")
 async def warnings(interaction: discord.Interaction, user: discord.Member):
     if not await ensure_guild_interaction(interaction):
@@ -395,6 +417,8 @@ async def warnings(interaction: discord.Interaction, user: discord.Member):
 
 
 @client.tree.command(name="clear_warnings", description="Clear all warnings for a member")
+@app_commands.guild_only()
+@app_commands.default_permissions(moderate_members=True)
 @app_commands.describe(user="Member whose warnings should be cleared")
 async def clear_warnings(interaction: discord.Interaction, user: discord.Member):
     if not await ensure_guild_interaction(interaction):
@@ -409,6 +433,39 @@ async def clear_warnings(interaction: discord.Interaction, user: discord.Member)
     cleared = store.clear_warnings(interaction.guild.id, user.id)
     await interaction.response.send_message(
         f"Cleared {cleared} warning(s) for {user.mention}.", ephemeral=True
+    )
+
+
+@client.tree.command(
+    name="test_welcome",
+    description="Test welcome DM and entry-channel join message for a member",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.describe(member="Member to run welcome flow for (defaults to you)")
+async def test_welcome(
+    interaction: discord.Interaction,
+    member: Optional[discord.Member] = None,
+):
+    if not await ensure_guild_interaction(interaction):
+        return
+    if not isinstance(interaction.user, discord.Member) or not has_manage_guild(interaction.user):
+        await interaction.response.send_message(
+            "You need Manage Server permission to use this command.",
+            ephemeral=True,
+        )
+        return
+
+    target = member or interaction.user
+    dm_sent, channel_sent = await send_welcome_for_member(target)
+
+    await interaction.response.send_message(
+        (
+            f"Welcome test complete for {target.mention}. "
+            f"DM sent: {'yes' if dm_sent else 'no'}. "
+            f"Entry channel message sent: {'yes' if channel_sent else 'no'}."
+        ),
+        ephemeral=True,
     )
 
 
