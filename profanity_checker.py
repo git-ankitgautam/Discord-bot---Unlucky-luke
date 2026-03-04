@@ -2,8 +2,15 @@ import re
 
 # Load once at start
 with open("profanity_wordslist.txt") as f:
-    # Use a set for fast lookup, lowercase all words
-    PROFANITY_WORDS = set(word.strip().lower() for word in f if word.strip())
+    RAW_PROFANITY_WORDS = [word.strip().lower() for word in f if word.strip()]
+
+# Split exact words and wildcard patterns for faster checks
+PROFANITY_WORDS = {word for word in RAW_PROFANITY_WORDS if "*" not in word}
+PROFANITY_PATTERNS = [
+    re.compile(re.escape(word).replace(r"\*", ".*"))
+    for word in RAW_PROFANITY_WORDS
+    if "*" in word
+]
 
 # Leetspeak mapping function
 def normalize_leetspeak(text):
@@ -31,5 +38,9 @@ def profanity_check(search_string):
     # Check if any normalized word is in profanity set
     for word in words:
         if word in PROFANITY_WORDS:
+            return True
+    # Check wildcard patterns against words and full normalized text
+    for pattern in PROFANITY_PATTERNS:
+        if pattern.search(normalized):
             return True
     return False

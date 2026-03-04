@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import timedelta
 from typing import Literal, Optional
 
@@ -14,6 +15,20 @@ from imbored import joke_response
 from moderation_logic import evaluate_exemption
 from moderation_store import ModerationStore, render_member_template
 from profanity_checker import profanity_check
+
+
+logger = logging.getLogger("disbot")
+if not logger.handlers:
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+    )
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    file_handler = logging.FileHandler("bot.log", encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+    logger.addHandler(file_handler)
 
 
 store = ModerationStore()
@@ -55,19 +70,19 @@ async def ensure_guild_interaction(interaction: discord.Interaction) -> bool:
 
 class BotClient(commands.Bot):
     async def on_ready(self):
-        print("Unlucky_luke ready")
+        logger.info("Unlucky_luke ready")
         try:
             store.initialize()
             synced = await self.tree.sync()
-            print(f"Synced {len(synced)} commands")
+            logger.info("Synced %s commands", len(synced))
         except Exception as e:
-            print(f"Unlucky_luke ran into an error: {e}")
+            logger.exception("Unlucky_luke ran into an error: %s", e)
 
     async def on_member_join(self, member: discord.Member):
         try:
             await send_welcome_for_member(member)
         except Exception as e:
-            print(f"Failed welcome flow for guild={member.guild.id}: {e}")
+            logger.exception("Failed welcome flow for guild=%s: %s", member.guild.id, e)
 
     async def on_message(self, message: discord.Message):
         if message.author == self.user or message.author.bot:
@@ -87,8 +102,19 @@ class BotClient(commands.Bot):
             return
 
         try:
+            logger.info(
+                "Profanity detected in guild=%s user=%s message_id=%s",
+                message.guild.id,
+                message.author.id,
+                message.id,
+            )
             settings = store.ensure_guild_settings(message.guild.id)
             if is_exempt(message.author, settings):
+                logger.info(
+                    "Profanity moderation skipped due to exemption for user=%s guild=%s",
+                    message.author.id,
+                    message.guild.id,
+                )
                 return
 
             store.add_warning(
@@ -115,19 +141,36 @@ class BotClient(commands.Bot):
                 timeout_until = discord.utils.utcnow() + timedelta(minutes=timeout_minutes)
                 try:
                     await message.author.timeout(timeout_until, reason="Profanity threshold reached")
+                    logger.warning(
+                        "Applied timeout to user=%s guild=%s duration_minutes=%s",
+                        message.author.id,
+                        message.guild.id,
+                        timeout_minutes,
+                    )
                     await message.channel.send(
                         f"{message.author.mention} has been timed out for {timeout_minutes} minute(s) due to repeated profanity."
                     )
                 except discord.Forbidden:
+                    logger.warning(
+                        "Missing permission to timeout user=%s in guild=%s",
+                        message.author.id,
+                        message.guild.id,
+                    )
                     await message.channel.send(
                         "I do not have permission to timeout this member."
                     )
                 except discord.HTTPException as err:
+                    logger.exception(
+                        "Discord API error while timing out user=%s in guild=%s: %s",
+                        message.author.id,
+                        message.guild.id,
+                        err,
+                    )
                     await message.channel.send(
                         f"Failed to timeout member due to an API error: {err}"
                     )
         except Exception as e:
-            print(f"Profanity moderation error in guild={message.guild.id}: {e}")
+            logger.exception("Profanity moderation error in guild=%s: %s", message.guild.id, e)
 
 
 intents_list = discord.Intents.default()
@@ -153,6 +196,11 @@ async def send_welcome_for_member(member: discord.Member) -> tuple[bool, bool]:
             dm_sent = True
         except discord.Forbidden:
             dm_sent = False
+            logger.info(
+                "Welcome DM blocked for user=%s guild=%s (DM likely closed)",
+                member.id,
+                member.guild.id,
+            )
 
     entry_channel_id = settings["entry_channel_id"]
     if entry_channel_id:
@@ -167,6 +215,13 @@ async def send_welcome_for_member(member: discord.Member) -> tuple[bool, bool]:
             await channel.send(join_text)
             channel_sent = True
 
+    logger.info(
+        "Welcome flow finished for user=%s guild=%s dm_sent=%s channel_sent=%s",
+        member.id,
+        member.guild.id,
+        dm_sent,
+        channel_sent,
+    )
     return dm_sent, channel_sent
 
 
