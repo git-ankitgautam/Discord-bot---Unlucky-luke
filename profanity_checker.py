@@ -19,7 +19,7 @@ def normalize_leetspeak(text):
         '5': 's',
         '7': 't',
         '+': 't',
-        '2': 'z',
+        '2': 'z'
     }
     return ''.join(substitutions.get(c, c) or '' for c in text)
 
