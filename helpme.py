@@ -25,8 +25,8 @@ def help_embed():
         inline=False,
     )
     embed.add_field(
-        name="/luke_says [prompt]",
-        value="Get a Luke-style line using the local message dataset.",
+        name="@Unlucky_luke",
+        value="Tag the bot in a message and it will reply in Luke style.",
         inline=False,
     )
 

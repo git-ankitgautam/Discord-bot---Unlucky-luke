@@ -1,11 +1,9 @@
-__pycache__
-Discord py code
-node_modules
 gitignore
 .env
-/.vscode
 test*.py
 *backup.py
-profanity_wordslist.txt
 *test.py
 *.jsonl
+*.log
+*.txt
+*/

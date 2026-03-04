@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import os
+import re
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
@@ -9,6 +11,8 @@ from typing import Literal, Optional
 import discord
 from discord import app_commands
 from discord.ext import commands
+from google import genai
+from google.genai import types
 
 from config import TOKEN
 from enlightenme import get_quote
@@ -42,6 +46,21 @@ if not logger.handlers:
 
 store = ModerationStore()
 store.initialize()
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+LUKE_FILE_SEARCH_STORE = os.getenv("LUKE_FILE_SEARCH_STORE")
+_gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+_system_prompt_path = Path("luke_system_prompt.txt")
+if _system_prompt_path.exists():
+    LUKE_SYSTEM_PROMPT = _system_prompt_path.read_text(encoding="utf-8")
+else:
+    LUKE_SYSTEM_PROMPT = (
+        "You are a Discord assistant speaking in Luke's style. "
+        "Keep replies concise, practical, and friendly."
+    )
+if not LUKE_FILE_SEARCH_STORE:
+    logger.warning("LUKE_FILE_SEARCH_STORE is missing; mention replies will use local fallback only")
+
 LEADER_DATASET_FILE = find_latest_dataset_file(".")
 LEADER_MESSAGES = (
     load_leader_messages(LEADER_DATASET_FILE) if LEADER_DATASET_FILE else []
@@ -89,6 +108,45 @@ async def ensure_guild_interaction(interaction: discord.Interaction) -> bool:
     return True
 
 
+def _strip_bot_mentions(text: str, bot_user_id: int) -> str:
+    pattern = rf"<@!?{bot_user_id}>"
+    cleaned = re.sub(pattern, "", text).strip()
+    return cleaned
+
+
+def _generate_local_fallback_reply(prompt: str) -> str:
+    if not LEADER_MESSAGES:
+        return "I heard you, but I do not have enough context loaded yet."
+    selected = pick_best_match(LEADER_MESSAGES, prompt) if prompt else pick_random_message(LEADER_MESSAGES)
+    if not selected:
+        return "I heard you, but I do not have enough context loaded yet."
+    return str(selected["content"])
+
+
+def generate_luke_reply(prompt: str) -> str:
+    if not LUKE_FILE_SEARCH_STORE:
+        return _generate_local_fallback_reply(prompt)
+
+    response = _gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=LUKE_SYSTEM_PROMPT,
+            tools=[
+                types.Tool(
+                    file_search=types.FileSearch(
+                        file_search_store_names=[LUKE_FILE_SEARCH_STORE]
+                    )
+                )
+            ],
+        ),
+    )
+    text = (response.text or "").strip()
+    if not text:
+        return _generate_local_fallback_reply(prompt)
+    return text
+
+
 class BotClient(commands.Bot):
     async def on_ready(self):
         logger.info("Unlucky_luke ready")
@@ -115,6 +173,17 @@ class BotClient(commands.Bot):
             await message.channel.send(
                 f"Hello {message.author.display_name}, this is a 100 percent luke, there is no doubt to it, trust me :D"
             )
+
+        if self.user and self.user in message.mentions:
+            user_prompt = _strip_bot_mentions(message.content, self.user.id)
+            if not user_prompt:
+                user_prompt = "Say a short hello to the member in Luke style."
+            try:
+                luke_reply = await asyncio.to_thread(generate_luke_reply, user_prompt)
+            except Exception as err:
+                logger.exception("Mention reply generation failed: %s", err)
+                luke_reply = _generate_local_fallback_reply(user_prompt)
+            await message.reply(luke_reply, mention_author=False)
 
         if not profanity_check(msg):
             return
@@ -302,39 +371,8 @@ async def imbored(interaction: discord.Interaction):
 
 
 @client.tree.command(
-    name="luke_says",
-    description="Get a Luke-style line from your exported message dataset",
-)
-@app_commands.describe(prompt="Optional topic to find a matching line")
-async def luke_says(interaction: discord.Interaction, prompt: Optional[str] = None):
-    if not LEADER_MESSAGES:
-        await interaction.response.send_message(
-            "I cannot find a dataset file. Add a `user_messages_*.jsonl` export in this folder and restart the bot.",
-            ephemeral=True,
-        )
-        return
-
-    selected = (
-        pick_best_match(LEADER_MESSAGES, prompt)
-        if prompt
-        else pick_random_message(LEADER_MESSAGES)
-    )
-    if not selected:
-        await interaction.response.send_message(
-            "Dataset is loaded but no usable messages were found.",
-            ephemeral=True,
-        )
-        return
-
-    content = selected["content"]
-    jump_url = selected.get("jump_url", "")
-    footer = f"\n\nSource: {jump_url}" if jump_url else ""
-    await interaction.response.send_message(content + footer)
-
-
-@client.tree.command(
     name="luke_dataset_stats",
-    description="Show status of the local Luke message dataset",
+    description="Show status of Luke context sources",
 )
 @app_commands.default_permissions(manage_guild=True)
 @app_commands.guild_only()
@@ -357,6 +395,7 @@ async def luke_dataset_stats(interaction: discord.Interaction):
 
     await interaction.response.send_message(
         (
+            f"Gemini store: `{LUKE_FILE_SEARCH_STORE or 'not-set'}`\n"
             f"Dataset file: `{LEADER_DATASET_FILE.name}`\n"
             f"Usable messages loaded: {len(LEADER_MESSAGES)}"
         ),
