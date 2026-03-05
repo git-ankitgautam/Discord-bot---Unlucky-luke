@@ -3,8 +3,10 @@ import json
 import logging
 import os
 import re
+import requests
 from datetime import datetime
 from datetime import timedelta
+from html import unescape
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -14,7 +16,7 @@ from discord.ext import commands
 from google import genai
 from google.genai import types
 
-from config import TOKEN
+from config import API_KEY, TOKEN
 from enlightenme import get_quote
 from faction_intros_embed import response_embed
 from helpme import help_embed
@@ -60,6 +62,13 @@ else:
     )
 if not LUKE_FILE_SEARCH_STORE:
     logger.warning("LUKE_FILE_SEARCH_STORE is missing; mention replies will use local fallback only")
+
+with open("Factionsdata.txt", encoding="utf-8") as _factions_file:
+    _factions_data = json.load(_factions_file)
+DEVLINS_FACTIONS_BY_ID = {
+    int(entry["ID"]): entry["name"] for entry in _factions_data.values()
+}
+DEVLINS_FACTION_IDS = set(DEVLINS_FACTIONS_BY_ID.keys())
 
 LEADER_DATASET_FILE = find_latest_dataset_file(".")
 LEADER_MESSAGES = (
@@ -145,6 +154,47 @@ def generate_luke_reply(prompt: str) -> str:
     if not text:
         return _generate_local_fallback_reply(prompt)
     return text
+
+
+def get_devlins_faction_name_for_discord_user(discord_user_id: int) -> Optional[str]:
+    try:
+        response = requests.get(
+            f"https://api.torn.com/user/{discord_user_id}?selections=profile&key={API_KEY}",
+            timeout=15,
+        )
+    except requests.RequestException as err:
+        logger.warning("Torn API request failed for discord user %s: %s", discord_user_id, err)
+        return None
+
+    if response.status_code != 200:
+        logger.warning(
+            "Torn API returned non-200 for discord user %s: %s",
+            discord_user_id,
+            response.status_code,
+        )
+        return None
+
+    payload = response.json()
+    if "error" in payload:
+        return None
+
+    faction = payload.get("faction") or {}
+    faction_id = faction.get("faction_id")
+    if faction_id is None:
+        return None
+
+    try:
+        faction_id_int = int(faction_id)
+    except (TypeError, ValueError):
+        return None
+
+    if faction_id_int not in DEVLINS_FACTION_IDS:
+        return None
+
+    faction_name = DEVLINS_FACTIONS_BY_ID.get(faction_id_int) or faction.get("faction_name")
+    if not faction_name:
+        return None
+    return unescape(str(faction_name))
 
 
 class BotClient(commands.Bot):
@@ -302,12 +352,18 @@ async def send_welcome_for_member(member: discord.Member) -> tuple[bool, bool]:
     if entry_channel_id:
         channel = member.guild.get_channel(int(entry_channel_id))
         if channel and isinstance(channel, discord.TextChannel):
-            join_text = render_member_template(
-                settings["join_template"],
-                member.mention,
-                member.display_name,
-                member.guild.name,
+            faction_name = await asyncio.to_thread(
+                get_devlins_faction_name_for_discord_user, member.id
             )
+            if faction_name:
+                join_text = f"{member.mention} of {faction_name} has joined the server"
+            else:
+                join_text = render_member_template(
+                    settings["join_template"],
+                    member.mention,
+                    member.display_name,
+                    member.guild.name,
+                )
             await channel.send(join_text)
             channel_sent = True
 
