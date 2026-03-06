@@ -6,11 +6,19 @@ with open("profanity_wordslist.txt") as f:
 
 # Split exact words and wildcard patterns for faster checks
 PROFANITY_WORDS = {word for word in RAW_PROFANITY_WORDS if "*" not in word}
-PROFANITY_PATTERNS = [
-    re.compile(re.escape(word).replace(r"\*", ".*"))
-    for word in RAW_PROFANITY_WORDS
-    if "*" in word
-]
+PROFANITY_PATTERNS = []
+for word in RAW_PROFANITY_WORDS:
+    if "*" not in word:
+        continue
+
+    # Very short wildcard cores (e.g. n***a -> "na") create huge false-positive ranges.
+    core = word.replace("*", "")
+    if len(core) < 3:
+        continue
+
+    # Keep wildcard matching inside word boundaries only.
+    pattern = r"\b" + re.escape(word).replace(r"\*", r"\w*") + r"\b"
+    PROFANITY_PATTERNS.append(re.compile(pattern))
 
 # Leetspeak mapping function
 def normalize_leetspeak(text):
@@ -39,7 +47,7 @@ def profanity_check(search_string):
     for word in words:
         if word in PROFANITY_WORDS:
             return True
-    # Check wildcard patterns against words and full normalized text
+    # Check wildcard patterns on normalized text with word boundaries
     for pattern in PROFANITY_PATTERNS:
         if pattern.search(normalized):
             return True

@@ -197,6 +197,18 @@ def get_devlins_faction_name_for_discord_user(discord_user_id: int) -> Optional[
     return unescape(str(faction_name))
 
 
+def _normalize_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def get_faction_role_mention(guild: discord.Guild, faction_name: str) -> Optional[str]:
+    target = _normalize_name(faction_name)
+    for role in guild.roles:
+        if _normalize_name(role.name) == target:
+            return role.mention
+    return None
+
+
 class BotClient(commands.Bot):
     async def on_ready(self):
         logger.info("Unlucky_luke ready")
@@ -356,7 +368,9 @@ async def send_welcome_for_member(member: discord.Member) -> tuple[bool, bool]:
                 get_devlins_faction_name_for_discord_user, member.id
             )
             if faction_name:
-                join_text = f"{member.mention} of {faction_name} has joined the server"
+                faction_role = get_faction_role_mention(member.guild, faction_name)
+                faction_label = faction_role or faction_name
+                join_text = f"{member.mention} of {faction_label} has joined the server"
             else:
                 join_text = render_member_template(
                     settings["join_template"],
